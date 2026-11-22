@@ -48,18 +48,26 @@ async function logSync(event_type, description, source, target, status = 'SUCCES
 }
 
 // ============================================================
-// FUZZY MATCHING
+// FUZZY MATCHING  (case-insensitive + whitespace-normalized)
 // ============================================================
 function findBestGuestMatch(typedName, guests, threshold = 0.55) {
   if (!guests || guests.length === 0) return null;
   if (!typedName || !typedName.trim()) return null;
-  const names = guests.map(g => g.guest_name);
-  const { bestMatch, bestMatchIndex } = stringSimilarity.findBestMatch(typedName.trim(), names);
+
+  // Normalize once — string-similarity is case-sensitive
+  const normalize = (s) => (s == null ? '' : String(s).trim().toLowerCase().replace(/\s+/g, ' '));
+
+  const query = normalize(typedName);
+  if (!query) return null;
+
+  const names = guests.map(g => normalize(g.guest_name));
+  const { bestMatch, bestMatchIndex } = stringSimilarity.findBestMatch(query, names);
+
   if (bestMatch.rating >= threshold) {
     return {
       guest: guests[bestMatchIndex],
       score: Math.round(bestMatch.rating * 100),
-      matchedName: bestMatch.target
+      matchedName: guests[bestMatchIndex].guest_name
     };
   }
   return null;
