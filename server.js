@@ -332,6 +332,9 @@ app.post('/api/pos/charge', async (req, res) => {
   const { customer_name, amount, idempotency_key } = req.body;
 
   if (!customer_name || !customer_name.trim() || !amount) {
+    await logSync('SYNC_REJECTED',
+      `Rejected charge: empty customer name or amount (name="${customer_name ?? ''}", amount=${amount ?? ''})`,
+      'POS', 'PMS');
     return res.status(400).json({ success: false, message: 'Customer name and amount are required' });
   }
 
