@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Grand Horizon Hotel Management System</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏨</text></svg>">
+  <link rel="stylesheet" href="style.css">
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <span class="brand-icon">GH</span>
+      <div class="brand-text">
+        <strong>Grand Horizon</strong>
+        <span>Hotel Management</span>
+      </div>
+    </div>
+
+    <nav class="nav">
+      <a class="nav-item active" data-view="dashboard"><span class="nav-icon">◈</span>Dashboard</a>
+      <a class="nav-item" data-view="bookings"><span class="nav-icon">▤</span>Bookings</a>
+      <a class="nav-item" data-view="rooms"><span class="nav-icon">▦</span>Rooms</a>
+      <a class="nav-item" data-view="pos"><span class="nav-icon">◐</span>POS Terminal</a>
+      <a class="nav-item" data-view="mdm"><span class="nav-icon">◉</span>MDM Hub</a>
+      <a class="nav-item" data-view="labs"><span class="nav-icon">⚙</span>Advanced Labs</a>
+      <a class="nav-item" data-view="synclog"><span class="nav-icon">⟲</span>Sync Log</a>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="live-dot"></div>
+      <span>Live</span>
+      <span id="syncCount">0 events</span>
+    </div>
+  </aside>
+
+  <main class="main">
+    <header class="topbar">
+      <h1 id="viewTitle">Dashboard</h1>
+      <div class="topbar-right">
+        <span class="clock" id="clock"></span>
+        <button class="btn-ghost" onclick="resetSystem()">Reset</button>
+      </div>
+    </header>
+
+    <div class="views">
+      <section class="view active" id="view-dashboard">
+        <div class="kpi-grid">
+          <div class="kpi kpi-blue">
+            <div class="kpi-label">Occupancy</div>
+            <div class="kpi-value" id="kpiOccupancy">0%</div>
+            <div class="kpi-sub" id="kpiOccupancySub">0 of 0 rooms</div>
+          </div>
+          <div class="kpi kpi-green">
+            <div class="kpi-label">Total Revenue</div>
+            <div class="kpi-value" id="kpiRevenue">$0</div>
+            <div class="kpi-sub">Confirmed bookings + folios</div>
+          </div>
+          <div class="kpi kpi-amber">
+            <div class="kpi-label">Active Bookings</div>
+            <div class="kpi-value" id="kpiActive">0</div>
+            <div class="kpi-sub">Reserved + Checked-In</div>
+          </div>
+          <div class="kpi kpi-purple">
+            <div class="kpi-label">Today's Activity</div>
+            <div class="kpi-value" id="kpiTodayActivity">0</div>
+            <div class="kpi-sub" id="kpiTodaySub">0 arrivals / 0 departures</div>
+          </div>
+        </div>
+
+        <div class="chart-grid">
+          <div class="card">
+            <div class="card-header"><h3>Revenue Trend (Last 7 Days)</h3></div>
+            <div class="chart-container"><canvas id="revenueChart"></canvas></div>
+          </div>
+          <div class="card">
+            <div class="card-header"><h3>Room Status</h3></div>
+            <div class="chart-container"><canvas id="roomChart"></canvas></div>
+          </div>
+        </div>
+
+        <div class="activity-grid">
+          <div class="card">
+            <div class="card-header">
+              <h3>Active Reservations</h3>
+              <button class="btn-link" onclick="navigateTo('bookings')">View all</button>
+            </div>
+            <div id="dashReservations"></div>
+          </div>
+          <div class="card">
+            <div class="card-header">
+              <h3>Recent Sync Events</h3>
+              <button class="btn-link" onclick="navigateTo('synclog')">Full log</button>
+            </div>
+            <div id="dashSyncEvents" class="mini-feed"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="view" id="view-bookings">
+        <div class="card">
+          <div class="card-header"><h3>New Reservation</h3></div>
+          <form id="bookingForm" class="form">
+            <div class="form-row">
+              <div class="form-group">
+                <label>Guest Name</label>
+                <input type="text" id="bkGuestName" placeholder="Full name" required>
+              </div>
+              <div class="form-group">
+                <label>Email</label>
+                <input type="email" id="bkEmail" placeholder="guest@email.com">
+              </div>
+              <div class="form-group">
+                <label>Phone</label>
+                <input type="tel" id="bkPhone" placeholder="0917-000-0000">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Hotel</label>
+                <select id="bkHotel" onchange="updateBookingRooms()" required>
+                  <option value="">Select hotel</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Room</label>
+                <select id="bkRoom" required>
+                  <option value="">Select room</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Check-in</label>
+                <input type="date" id="bkCheckIn" required>
+              </div>
+              <div class="form-group">
+                <label>Check-out</label>
+                <input type="date" id="bkCheckOut" required>
+              </div>
+            </div>
+            <div class="form-actions">
+              <span id="bookingEstimate" class="form-estimate"></span>
+              <button type="submit" class="btn-primary">Create Booking</button>
+            </div>
+          </form>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h3>All Reservations</h3>
+            <input type="text" id="bookingSearch" placeholder="Search guest or room" class="search-input">
+          </div>
+          <div id="bookingsList" class="table-wrap"></div>
+        </div>
+      </section>
+
+      <section class="view" id="view-rooms">
+        <div class="toolbar">
+          <div class="toolbar-group">
+            <label>Hotel</label>
+            <select id="roomFilterHotel" onchange="loadRooms()">
+              <option value="">All Hotels</option>
+            </select>
+          </div>
+          <div class="toolbar-group">
+            <label>Status</label>
+            <select id="roomFilterStatus" onchange="loadRooms()">
+              <option value="">All Statuses</option>
+              <option value="Available">Available</option>
+              <option value="Reserved">Reserved</option>
+              <option value="Occupied">Occupied</option>
+            </select>
+          </div>
+          <div class="toolbar-legend">
+            <span class="legend-item"><span class="dot dot-green"></span>Available</span>
+            <span class="legend-item"><span class="dot dot-amber"></span>Reserved</span>
+            <span class="legend-item"><span class="dot dot-red"></span>Occupied</span>
+          </div>
+        </div>
+        <div id="roomGrid" class="room-grid"></div>
+      </section>
+
+      <section class="view" id="view-pos">
+        <div class="grid-two">
+          <div class="card">
+            <div class="card-header">
+              <h3>POS Terminal</h3>
+              <span class="pill pill-blue">Input</span>
+            </div>
+            <form id="posForm" class="form">
+              <div class="form-group">
+                <label>Guest Name</label>
+                <input type="text" id="posName" placeholder="Type guest name" required>
+              </div>
+              <div class="form-group">
+                <label>Amount ($)</label>
+                <input type="number" id="posAmount" step="0.01" placeholder="0.00" required>
+              </div>
+              <div class="form-group">
+                <label class="checkbox-label">
+                  <input type="checkbox" id="useIdempotency" checked>
+                  Use idempotency key
+                </label>
+              </div>
+              <button type="submit" class="btn-primary">Charge to Room</button>
+            </form>
+            <div id="posStatus" class="status-box"></div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <h3>Currently Checked-In Guests</h3>
+              <span class="pill pill-green">Real-Time</span>
+            </div>
+            <div id="posCheckedIn"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="view" id="view-mdm">
+        <div class="card">
+          <div class="card-header">
+            <h3>Master Data Management</h3>
+            <div class="card-actions">
+              <button class="btn-warning" onclick="runETL()">Run ETL</button>
+              <button class="btn-secondary" onclick="loadMDM()">Refresh</button>
+            </div>
+          </div>
+          <p class="card-desc">
+            The ETL process extracts data from PMS and POS, matches records using fuzzy logic, enriches them with loyalty tiers, and loads them into the MDM golden records.
+          </p>
+          <div id="mdmTable" class="table-wrap"></div>
+        </div>
+      </section>
+
+      <section class="view" id="view-labs">
+        <div class="grid-two">
+          <div class="card">
+            <div class="card-header">
+              <h3>Race Condition Lab</h3>
+              <span class="pill pill-amber">Advanced</span>
+            </div>
+            <p class="card-desc">
+              Two POS terminals charge the same checked-in guest simultaneously. Compare the unsafe read-then-write pattern against the safe atomic increment.
+            </p>
+            <div class="form-group">
+              <label>Guest (must be checked-in)</label>
+              <input type="text" id="raceName" value="Sarah Connor">
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Terminal A</label>
+                <input type="number" id="raceAmountA" value="50" step="0.01">
+              </div>
+              <div class="form-group">
+                <label>Terminal B</label>
+                <input type="number" id="raceAmountB" value="75" step="0.01">
+              </div>
+            </div>
+            <div class="form-actions">
+              <button class="btn-danger" onclick="runRace('unsafe')">Test Unsafe</button>
+              <button class="btn-success" onclick="runRace('safe')">Test Safe</button>
+            </div>
+            <div id="raceResult" class="status-box"></div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <h3>Data Virtualization</h3>
+              <span class="pill pill-blue">Read-Only</span>
+            </div>
+            <p class="card-desc">
+              Generate a checkout receipt using a cross-database JOIN. This queries MDM, PMS reservations, and PMS rooms simultaneously without copying data.
+            </p>
+            <div class="form-group">
+              <label>Guest ID (1-20)</label>
+              <input type="number" id="checkoutId" value="2" min="1" max="20">
+            </div>
+            <button class="btn-primary" onclick="runCheckout()">Generate Receipt</button>
+            <pre id="checkoutResult" class="code-output">Click Generate Receipt to see the JSON output</pre>
+          </div>
+        </div>
+      </section>
+
+      <section class="view" id="view-synclog">
+        <div class="card">
+          <div class="card-header">
+            <h3>Live Synchronization Log</h3>
+            <div class="card-actions">
+              <span class="pill pill-green">Live Feed</span>
+              <button class="btn-secondary small" onclick="clearSyncUI()">Clear UI</button>
+            </div>
+          </div>
+          <div id="syncLogFull" class="sync-feed"></div>
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
